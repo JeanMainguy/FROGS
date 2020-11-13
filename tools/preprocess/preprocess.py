@@ -742,7 +742,7 @@ def samples_from_tar( archive, contiged, global_tmp_files, R1_files, R2_files, s
     R2_tmp = list()
     tmp_folder = os.path.join( global_tmp_files.tmp_dir, global_tmp_files.prefix + "_tmp" )
     if not tarfile.is_tarfile(archive):
-        raise Exception("\nThe archive '" + archive + "' is not a tar file.\n\n")
+        raise Exception("\n\n#ERROR : The archive '" + archive + "' is not a tar file.\n\n")
     FH_tar = tarfile.open(archive)
     # List R1_files, R2_files and samples_names
     archive_members = sorted(FH_tar.getmembers(), key=lambda member: member.name)
@@ -761,14 +761,14 @@ def samples_from_tar( archive, contiged, global_tmp_files, R1_files, R2_files, s
                     R2_files.append( global_tmp_files.add(file_info.name) )
                     R2_tmp.append( os.path.join(tmp_folder, file_info.name) )
                 else:
-                    raise Exception("\nThe file '" + file_info.name + "' in archive '" + archive + "' is invalid. The files names must contain '_R1' or '_R2'.\n\n")
+                    raise Exception("\n\n#ERROR : The file '" + file_info.name + "' in archive '" + archive + "' is invalid. The files names must contain '_R1' or '_R2'.\n\n")
         else:
-            raise Exception("\nThe archive '" + archive + "' must not contain folders.")
+            raise Exception("\n\n#ERROR : The archive '" + archive + "' must not contain folders.")
     if len(R1_files) != len(R2_files) and not contiged:
         if len(R1_files) > len(R2_files):
-            raise Exception( "\n" + str(len(R1_files) - len(R2_files)) + " R2 file(s) are missing in arhive '" + archive + "'. R1 file : [" + ", ".join(R1_files) + "] ; R2 files : [" + ", ".join(R2_files) + "]\n\n" )
+            raise Exception( "\n\n#ERORR : " + str(len(R1_files) - len(R2_files)) + " R2 file(s) are missing in arhive '" + archive + "'. R1 file : [" + ", ".join(R1_files) + "] ; R2 files : [" + ", ".join(R2_files) + "]\n\n" )
         else:
-            raise Exception( "\n" + str(len(R2_files) - len(R1_files)) + " R1 file(s) are missing in arhive '" + archive + "'. R1 file : [" + ", ".join(R1_files) + "] ; R2 files : [" + ", ".join(R2_files) + "]\n\n" )
+            raise Exception( "\n\n#ERROR : " + str(len(R2_files) - len(R1_files)) + " R1 file(s) are missing in arhive '" + archive + "'. R1 file : [" + ", ".join(R1_files) + "] ; R2 files : [" + ", ".join(R2_files) + "]\n\n" )
     try:
         # Extract
         FH_tar.extractall(tmp_folder)
@@ -1021,7 +1021,7 @@ def process( args ):
             if args.samples_names is not None:
                 samples_names = args.samples_names
         if len(samples_names) != len(set(samples_names)):
-            raise Exception( '\nImpossible to retrieve unique samples names from files. The sample name must be before the first dot.\n\n' )
+            raise Exception( '\n\n#ERROR : Impossible to retrieve unique samples names from files. The sample name must be before the first dot.\n\n' )
 
         # Tmp files
         filtered_files = [tmp_files.add(current_sample + '_filtered.fasta') for current_sample in samples_names]
@@ -1061,7 +1061,7 @@ def process( args ):
             # Check processes status
             for current_process in processes:
                 if issubclass(current_process['process'].__class__, multiprocessing.Process) and current_process['process'].exitcode != 0:
-                    raise Exception( "\nError in sub-process execution.\n\n" )
+                    raise Exception( "\n\n#ERROR : Error in sub-process execution.\n\n" )
 
         # Write summary
         log_append_files( args.log_file, log_files )
@@ -1074,7 +1074,7 @@ def process( args ):
         # Check the number of sequences after filtering
         nb_seq = get_nb_seq(args.output_dereplicated)
         if  nb_seq == 0:
-            raise Exception( "\nThe filters have eliminated all sequences (see summary for more details).\n\n" )
+            raise Exception( "\n\n#ERROR : The filters have eliminated all sequences (see summary for more details).\n\n" )
 
     # Remove temporary files
     finally:
@@ -1085,7 +1085,7 @@ def spl_name_type( arg_value ):
     """
     @summary: Argparse type for samples-names.
     """
-    if re.search("\s", arg_value): raise argparse.ArgumentTypeError( "\nA sample name must not contain white spaces.\n\n" )
+    if re.search("\s", arg_value): raise argparse.ArgumentTypeError( "\n\n#ERROR : A sample name must not contain white spaces.\n\n" )
     return str(arg_value)
 
 
@@ -1107,7 +1107,7 @@ if __name__ == "__main__":
       --min-amplicon-size MIN_AMPLICON_SIZE
       --max-amplicon-size MAX_AMPLICON_SIZE
       --without-primers | --five-prim-primer FIVE_PRIM_PRIMER --three-prim-primer THREE_PRIM_PRIMER
-      [--fungi {ITS1,ITS2}] [--keep-unmerged]
+      [--keep-unmerged]
       [--samples-names SAMPLE_NAME [SAMPLE_NAME ...]]
       [-p NB_CPUS] [--debug] [-v]
       [-d DEREPLICATED_FILE] [-c COUNT_FILE] 
@@ -1120,7 +1120,6 @@ if __name__ == "__main__":
       --min-amplicon-size MIN_AMPLICON_SIZE
       --max-amplicon-size MAX_AMPLICON_SIZE
       --without-primers | --five-prim-primer FIVE_PRIM_PRIMER --three-prim-primer THREE_PRIM_PRIMER
-      [--fungi {ITS1,ITS2}] 
       [-p NB_CPUS] [--debug] [-v]
       [-d DEREPLICATED_FILE] [-c COUNT_FILE] [--artComb-output-dereplicated ART_DEREPLICATED_FILE] [--artComb-output-count ART_COUNT_FILE]
       [-s SUMMARY_FILE] [-l LOG_FILE]
@@ -1150,9 +1149,9 @@ if __name__ == "__main__":
     group_illumina_input.set_defaults( sequencer='illumina' )
     #     Illumina outputs
     group_illumina_output = parser_illumina.add_argument_group( 'Outputs' )
-    group_illumina_output.add_argument( '-d', '--output-dereplicated', default='dereplication.fasta', help='Fasta file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
-    group_illumina_output.add_argument( '-c', '--output-count', default='count.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
-    group_illumina_output.add_argument( '-s', '--summary', default='summary.html', help='HTML file with summary of filters results. [Default: %(default)s]')
+    group_illumina_output.add_argument( '-d', '--output-dereplicated', default='preprocess.fasta', help='FASTA file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
+    group_illumina_output.add_argument( '-c', '--output-count', default='preprocess_counts.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
+    group_illumina_output.add_argument( '-s', '--summary', default='preprocess.html', help='The HTML file containing the graphs. [Default: %(default)s]')
     group_illumina_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')
 
     # 454
@@ -1163,7 +1162,6 @@ if __name__ == "__main__":
     --max-amplicon-size MAX_AMPLICON_SIZE
     --five-prim-primer FIVE_PRIM_PRIMER
     --three-prim-primer THREE_PRIM_PRIMER
-    [--fungi {ITS1,ITS2}]
     [-p NB_CPUS] [--debug] [-v]
     [-d DEREPLICATED_FILE] [-c COUNT_FILE]
     [-s SUMMARY_FILE] [-l LOG_FILE]
@@ -1182,9 +1180,9 @@ if __name__ == "__main__":
     group_454_input.set_defaults( sequencer='illumina' )
     #     454 outputs
     group_454_output = parser_454.add_argument_group( 'Outputs' )
-    group_454_output.add_argument( '-d', '--output-dereplicated', default='dereplication.fasta', help='Fasta file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
-    group_454_output.add_argument( '-c', '--output-count', default='count.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
-    group_454_output.add_argument( '-s', '--summary', default='summary.html', help='HTML file with summary of filters results. [Default: %(default)s]')
+    group_454_output.add_argument( '-d', '--output-dereplicated', default='preprocess.fasta', help='FASTA file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
+    group_454_output.add_argument( '-c', '--output-count', default='preprocess_counts.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
+    group_454_output.add_argument( '-s', '--summary', default='preprocess.html', help='The HTML file containing the graphs. [Default: %(default)s]')
     group_454_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')
     parser_454.set_defaults( sequencer='454' )
     parser_454.set_defaults( already_contiged=True, keep_unmerged=False )
@@ -1197,32 +1195,32 @@ if __name__ == "__main__":
     
     # Check parameters
     if args.input_archive is not None: # input is an archive
-        if args.input_R1 is not None: raise argparse.ArgumentTypeError( "\nWith '--archive-file' parameter you cannot set the parameter '--R1-files'.\n\n" )
-        if args.samples_names is not None: raise argparse.ArgumentTypeError( "\nWith '--archive-file' parameter you cannot set the parameter '--samples-names'.\n\n" )
+        if args.input_R1 is not None: raise argparse.ArgumentTypeError( "\n\n#ERROR : With '--archive-file' parameter you cannot set the parameter '--R1-files'.\n\n" )
+        if args.samples_names is not None: raise argparse.ArgumentTypeError( "\n\n#ERROR : With '--archive-file' parameter you cannot set the parameter '--samples-names'.\n\n" )
         if args.sequencer == "illumina":
-            if args.input_R2 is not None: raise argparse.ArgumentTypeError( "\nWith '--archive-file' parameter you cannot set the parameter '--R2-files'.\n\n" )
+            if args.input_R2 is not None: raise argparse.ArgumentTypeError( "\n\n#ERROR : With '--archive-file' parameter you cannot set the parameter '--R2-files'.\n\n" )
             
     else:  # inputs are files
-        if args.input_R1 is None: raise argparse.ArgumentTypeError( "\n'--R1-files' is required.\n\n" )
+        if args.input_R1 is None: raise argparse.ArgumentTypeError( "\n\n#ERROR : '--R1-files' is required.\n\n" )
         if args.samples_names is not None:
-            if len(args.samples_names) != len(args.input_R1): raise argparse.ArgumentTypeError( "\nWith '--samples-names' all samples must have a name.\n\n" )
+            if len(args.samples_names) != len(args.input_R1): raise argparse.ArgumentTypeError( "\n\n#ERROR : With '--samples-names' all samples must have a name.\n\n" )
             if len(args.samples_names) != len(set(args.samples_names)):
                 duplicated_samples = set([name for name in args.samples_names if args.samples_names.count(name) > 1])
-                raise argparse.ArgumentTypeError( '\nSamples names must be unique (duplicated: "' + '", "'.join(duplicated_samples) + '").\n\n' )
+                raise argparse.ArgumentTypeError( '\n\n#ERROR : Samples names must be unique (duplicated: "' + '", "'.join(duplicated_samples) + '").\n\n' )
         if args.sequencer == "illumina":
-            if not args.already_contiged and args.input_R2 is None: raise argparse.ArgumentTypeError( "\n'--R2-files' is required.\n\n" )
+            if not args.already_contiged and args.input_R2 is None: raise argparse.ArgumentTypeError( "\n\n#ERROR : '--R2-files' is required.\n\n" )
 
     if args.sequencer == "illumina":
-        if (args.R1_size is None or args.R2_size is None ) and not args.already_contiged: raise Exception( "\n'--R1-size/--R2-size' or '--already-contiged' must be setted.\n\n" )
+        if (args.R1_size is None or args.R2_size is None ) and not args.already_contiged: raise Exception( "\n\n#ERROR : '--R1-size/--R2-size' or '--already-contiged' must be setted.\n\n" )
         if args.without_primers:
-            if args.five_prim_primer or args.three_prim_primer: raise argparse.ArgumentTypeError( "\nThe option '--without-primers' cannot be used with '--five-prim-primer' and '--three-prim-primer'.\n\n" )
+            if args.five_prim_primer or args.three_prim_primer: raise argparse.ArgumentTypeError( "\n\n#ERROR : The option '--without-primers' cannot be used with '--five-prim-primer' and '--three-prim-primer'.\n\n" )
         else:
-            if args.five_prim_primer is None or args.three_prim_primer is None: raise argparse.ArgumentTypeError( "\n'--five-prim-primer/--three-prim-primer' or 'without-primers'  must be setted.\n\n" )
-            if args.min_amplicon_size <= (len(args.five_prim_primer) + len(args.three_prim_primer)): raise argparse.ArgumentTypeError( "\nThe minimum length of the amplicon (--min-length) must be superior to the size of the two primers, i.e "+str(len(args.five_prim_primer) + len(args.three_prim_primer)) + "\n\n")
-        if (args.already_contiged and args.keep_unmerged): raise Exception("\n--already-contiged and keep-unmerged options cannot be used together\n\n")
+            if args.five_prim_primer is None or args.three_prim_primer is None: raise argparse.ArgumentTypeError( "\n\n#ERROR : '--five-prim-primer/--three-prim-primer' or 'without-primers'  must be setted.\n\n" )
+            if args.min_amplicon_size <= (len(args.five_prim_primer) + len(args.three_prim_primer)): raise argparse.ArgumentTypeError( "\n\n#ERROR : The minimum length of the amplicon (--min-length) must be superior to the size of the two primers, i.e "+str(len(args.five_prim_primer) + len(args.three_prim_primer)) + "\n\n")
+        if (args.already_contiged and args.keep_unmerged): raise Exception("\n\n#ERROR : --already-contiged and keep-unmerged options cannot be used together\n\n")
         if (not args.already_contiged):
             if args.merge_software == "flash":
-                if args.expected_amplicon_size is None: raise argparse.ArgumentTypeError( "\nWith '--merge-software flash' you need to set the parameter '--expected-amplicon-size'.\n\n" )
+                if args.expected_amplicon_size is None: raise argparse.ArgumentTypeError( "\n\n#ERROR : With '--merge-software flash' you need to set the parameter '--expected-amplicon-size'.\n\n" )
 
     # Process
     process( args )

@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__author__ = 'Katia Vidal - Team NED Toulouse AND Frederic Escudie - Plateforme bioinformatique Toulouse AND Maria Bernard - Sigenae Jouy en Josas'
+__author__ = 'Maria Bernard - SIGENAE - Jouy-en-Josas'
 __copyright__ = 'Copyright (C) 2020 INRAE'
 __license__ = 'GNU General Public License'
 __version__ = '3.2'
@@ -114,9 +114,9 @@ def ratioParameter( arg_value ):
     try:
         float_arg_value = float(arg_value)
         if float_arg_value < 0.0 or float_arg_value > 1.0:
-            raise argparse.ArgumentTypeError("must be between 0.0 and 1.0.")
+            raise argparse.ArgumentTypeError("\n\n#ERROR : must be between 0.0 and 1.0.\n")
     except:
-        raise argparse.ArgumentTypeError("must be between 0.0 and 1.0.")
+        raise argparse.ArgumentTypeError("\n\n#ERROR : must be between 0.0 and 1.0.\n")
     return float_arg_value
 
 
@@ -133,13 +133,13 @@ class BootstrapParameter(argparse.Action):
                 "value": None
             }
         if len(value.split(":")) != 2:
-            raise argparse.ArgumentTypeError("\nThe parameter '--min-rdp-bootstrap' must be in format 'TAXONOMIC_LEVEL:MIN_BOOTSTRAP'.\n\n")
+            raise argparse.ArgumentTypeError("\n\n#ERROR : The parameter '--min-rdp-bootstrap' must be in format 'TAXONOMIC_LEVEL:MIN_BOOTSTRAP'.\n\n")
         output["rank"] = value.split(":")[0]
         output["value"] = value.split(":")[1]
         try:
             output["value"] = ratioParameter(output["value"])
         except:
-            raise argparse.ArgumentTypeError("\nThe value for the MIN_BOOTSTRAP in parameter '--min-rdp-bootstrap' must be between 0.0 and 1.0.\n\n")
+            raise argparse.ArgumentTypeError("\n\n#ERROR : The value for the MIN_BOOTSTRAP in parameter '--min-rdp-bootstrap' must be between 0.0 and 1.0.\n\n")
         setattr(namespace, self.dest, output)
 
 
@@ -229,7 +229,7 @@ def impacted_obs_by_undesired_taxon(input_biom, undesired_taxon_list, in_all_or_
     @summary : write the list of observation with affiliations including undesired taxon.
     @param input_biom: [str] The path to the BIOM file to check.
     @param undesired_taxon_list: [list] list of string to look for
-    @param in_all_or_in_consensus: [bool] if True, one taxon_ignored must be in the consensus or all affiliation must one of the taxon ignored
+    @param in_all_or_in_consensus: [bool] if True, one taxon_ignored must be in the consensus or all affiliation must contain one of the taxon ignored
     @param biom_out: [str] path to biom with removed undesired taxonomy
     @param impacted_file: [str] The path to the output file.
     @return n : number of filtered OTU
@@ -431,17 +431,41 @@ def write_summary( summary_file, input_biom, output_biom, discards, params ):
     samples_results = dict()
     filters_results = dict()
 
-    # Global before filters
+    # Number of taxon in each rank before filters
     in_biom = BiomIO.from_json( input_biom )
+    taxon_lost = {'Blast': { rank : list() for rank in range(len(params.taxonomic_ranks))}}
+    if in_biom.has_observation_metadata('rdp_taxonomy'):
+        taxon_lost['RDP'] = {rank : list() for rank in range(len(params.taxonomic_ranks))}
+    # for blast affiliation, consensus maybe updated, so lost of multiaffiliation should not be considered as taxon lost
+    taxon_common = { rank : list() for rank in range(len(params.taxonomic_ranks))}
+    taxon_gain = { rank : list() for rank in range(len(params.taxonomic_ranks))}
+
     for observation_name in in_biom.get_observations_names():
         global_results['nb_clstr_ini'] += 1
         global_results['nb_seq_ini'] += in_biom.get_observation_count( observation_name )
+        # track rdp taxon
+        if 'RDP' in taxon_lost:
+            rdp_taxonomy = in_biom.get_observation_metadata(observation_name)['rdp_taxonomy']
+            if issubclass(rdp_taxonomy.__class__,str):
+                rdp_taxonomy = rdp_taxonomy.split(';')
+            for i in range(len(params.taxonomic_ranks)):
+                if ';'.join(rdp_taxonomy[:i+1]) not in taxon_lost['RDP'][i]:
+                    taxon_lost['RDP'][i].append(';'.join(rdp_taxonomy[:i+1]))
+        # track blast taxon
+        blast_taxonomy = in_biom.get_observation_metadata(observation_name)['blast_taxonomy']
+        if issubclass(blast_taxonomy.__class__,str):
+            blast_taxonomy = blast_taxonomy.split(';')
+        for i in range(len(params.taxonomic_ranks)):
+            if ';'.join(blast_taxonomy[:i+1]) not in taxon_lost['Blast'][i]:
+                taxon_lost['Blast'][i].append(';'.join(blast_taxonomy[:i+1]))
+
     for sample_name in in_biom.get_samples_names():
         samples_results[sample_name] = {
             'initial': sum( 1 for x in in_biom.get_observations_by_sample(sample_name) ),
             'filtered': dict(),
             'kept': 0
         }
+
 
     # By sample and by filters
     filters_intersections = dict()
@@ -476,9 +500,40 @@ def write_summary( summary_file, input_biom, output_biom, discards, params ):
     for observation_name in out_biom.get_observations_names():
         global_results['nb_clstr_kept'] += 1
         global_results['nb_seq_kept'] += out_biom.get_observation_count( observation_name )
+
+        # track lost rdp taxon
+        if 'RDP' in taxon_lost:
+            rdp_taxonomy = out_biom.get_observation_metadata(observation_name)['rdp_taxonomy']
+            if issubclass(rdp_taxonomy.__class__,str):
+                rdp_taxonomy = rdp_taxonomy.split(';')
+            for i in range(len(params.taxonomic_ranks)):
+                if ';'.join(rdp_taxonomy[:i+1]) in taxon_lost['RDP'][i]:
+                    taxon_lost['RDP'][i].remove(';'.join(rdp_taxonomy[:i+1]))
+
+        # track blast taxon
+        blast_taxonomy = out_biom.get_observation_metadata(observation_name)['blast_taxonomy']
+        if issubclass(blast_taxonomy.__class__,str):
+            blast_taxonomy = blast_taxonomy.split(';')
+        for i in range(len(params.taxonomic_ranks)):
+            if ';'.join(blast_taxonomy[:i+1]) in taxon_lost['Blast'][i]:
+                taxon_lost['Blast'][i].remove(';'.join(blast_taxonomy[:i+1]))
+                taxon_common[i].append(';'.join(blast_taxonomy[:i+1]))
+            elif ';'.join(blast_taxonomy[:i+1]) not in taxon_lost['Blast'][i] + taxon_common[i] + taxon_gain[i]:
+                taxon_gain[i].append(';'.join(blast_taxonomy[:i+1]))
+
     for sample_name in out_biom.get_samples_names():
         samples_results[sample_name]['kept'] = sum( 1 for x in out_biom.get_observations_by_sample(sample_name) )
     del out_biom
+
+    #print(taxon_lost['Blast'][6])
+    #print(taxon_gain[6])
+    # store number instead of list of taxon lost
+    for i in range(len(params.taxonomic_ranks)):
+        taxon_lost['Blast'][params.taxonomic_ranks[i]] = len(taxon_lost['Blast'][i]) - len(taxon_gain[i])
+        taxon_lost['Blast'].pop(i)
+        if 'RDP' in taxon_lost:
+            taxon_lost['RDP'][params.taxonomic_ranks[i]] = len(taxon_lost['RDP'][i])
+            taxon_lost['RDP'].pop(i)
 
     # Write
     FH_summary_tpl = open( os.path.join(CURRENT_DIR, "affiliation_filters_tpl.html") )
@@ -488,6 +543,10 @@ def write_summary( summary_file, input_biom, output_biom, discards, params ):
             line = line.replace( "###PORCESSED_FILTERS###", json.dumps([filter for filter in discards]) )
         elif "###GLOBAL_RESULTS###" in line:
             line = line.replace( "###GLOBAL_RESULTS###", json.dumps(global_results) )
+        elif "###GLOBAL_TAXON_LIST###" in line:
+            line = line.replace( "###GLOBAL_TAXON_LIST###", json.dumps(params.taxonomic_ranks) )
+        elif "###GLOBAL_TAXON_LOST###" in line:
+            line = line.replace( "###GLOBAL_TAXON_LOST###", json.dumps(taxon_lost) )
         elif "###SAMPLES_RESULTS###" in line:
             line = line.replace( "###SAMPLES_RESULTS###", json.dumps(samples_results) )
         elif "###FILTERS_RESULTS###" in line:
@@ -568,7 +627,7 @@ def process( args ):
         # Writes outputs
         impacted_biom = tmpFiles.add("impacted.biom")
         write_impact( args, discards, impacted_biom, args.impacted, args.impacted_multihit)
-        write_summary( args.summary, biom_in, args.output_biom, discards, args )
+        write_summary( args.summary, args.input_biom, args.output_biom, discards, args )
 
     finally:
         if not args.debug : 
@@ -582,18 +641,18 @@ def process( args ):
 ##################################################################################################################################################
 if __name__ == '__main__':
     # Parameters
-    parser = argparse.ArgumentParser(description='Filters an abundance biom file on affiliations metrics')
+    parser = argparse.ArgumentParser(description='Filters an abundance BIOM file on affiliations metrics')
     parser.add_argument( '--debug', default=False, action='store_true', help="Keep temporary files to debug program." )
     parser.add_argument( '-v', '--version', action='version', version=__version__ )
-    parser.add_argument( '--taxonomic-ranks', nargs='*', default=["Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"], help='The ordered ranks levels used in the metadata taxonomy. [Default: %(default)s]' )
+    parser.add_argument( '--taxonomic-ranks', nargs='+', default=["Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"], help='The ordered ranks levels used in the metadata taxonomy. [Default: %(default)s]' )
     #     Filters behavior
     group_filter_bh = parser.add_argument_group( 'Filters behavior' )
     group_exclusion_filter_bh = group_filter_bh.add_mutually_exclusive_group()
-    group_exclusion_filter_bh.add_argument('-m','--mask', default=False, action='store_true', help="If affiliations do not respect one of the filter they are replaced by NA")
-    group_exclusion_filter_bh.add_argument('-d','--delete', default=False, action='store_true', help="If affiliations do not respect one of the filter the entire OTU is deleted.")
+    group_exclusion_filter_bh.add_argument('-m','--mask', default=False, action='store_true', help="If affiliations do not respect one of the filter they are replaced by NA (mutually exclusive with --delete)")
+    group_exclusion_filter_bh.add_argument('-d','--delete', default=False, action='store_true', help="If affiliations do not respect one of the filter the entire OTU is deleted.(mutually exclusive with --mask)")
     #     Filters
     group_filter = parser.add_argument_group( 'Filters' )
-    group_filter.add_argument( '--taxon-ignored', type=str, nargs='*', help="Taxon list to ignore when OTUs agggregation")
+    group_filter.add_argument( '--taxon-ignored', type=str, nargs='*', help="Taxon list to maks/delete")
     group_filter.add_argument( '-b', '--min-rdp-bootstrap', type=str, action=BootstrapParameter, metavar=("TAXONOMIC_LEVEL:MIN_BOOTSTRAP"), help="The minimal RDP bootstrap must be superior to this value (between 0 and 1)." )
     group_filter.add_argument( '-t', '--rdp-taxonomy-ranks', nargs='*', default=["Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"], help='The ordered ranks levels present in the reference databank. [Default: %(default)s]' )
     group_filter.add_argument( '-i', '--min-blast-identity', type=ratioParameter, help="The number corresponding to the blast percentage identity (between 0 and 1)." )
@@ -602,16 +661,16 @@ if __name__ == '__main__':
     group_filter.add_argument( '-l', '--min-blast-length', type=int, default=None, required=False, help="The number corresponding to the blast length." )
     #     Inputs
     group_input = parser.add_argument_group( 'Inputs' )
-    group_input.add_argument('--input-biom', required=True, help="The input biom file.")
-    group_input.add_argument('--input-fasta', required=True, help="The input fasta file.")
+    group_input.add_argument('--input-biom', required=True, help="The input BIOM file.")
+    group_input.add_argument('--input-fasta', required=True, help="The input FASTA file.")
     #     Outputs
     group_output = parser.add_argument_group( 'Outputs' )
-    group_output.add_argument('--output-biom', default="filtered.biom", help="The Biom file output. [Default: %(default)s]")
-    group_output.add_argument('--output-fasta', default="filtered.fasta", help="The fasta output file. [Default: %(default)s]")
-    group_output.add_argument('--summary', default="summary.html", help="The HTML file containing the graphs. [Default: %(default)s]")
-    group_output.add_argument('--impacted', default="impacted_clusters.tsv", help="The abundance file that summarizes all the clusters impacted (deleted or with affiliations masked). [Default: %(default)s]")
-    group_output.add_argument('--impacted-multihit', default="impacted_clusters_multihit.tsv", help="The multihit TSV file associated with impacted OTU. [Default: %(default)s]")
-    group_output.add_argument('--log-file', default=sys.stdout, help='The list of commands executed.')
+    group_output.add_argument('--output-biom', default="affiliation_filters.biom", help="The BIOM file output. [Default: %(default)s]")
+    group_output.add_argument('--output-fasta', default="affiliation_filters.fasta", help="The FASTA output file. [Default: %(default)s]")
+    group_output.add_argument('--summary', default="affiliation_filters.html", help="The HTML file containing the graphs. [Default: %(default)s]")
+    group_output.add_argument('--impacted', default="affiliation_filters_impacted_clusters.tsv", help="The abundance file that summarizes all the clusters impacted (deleted or with affiliations masked). [Default: %(default)s]")
+    group_output.add_argument('--impacted-multihit', default="affiliation_filters_impacted_clusters_multihit.tsv", help="The multihit TSV file associated with impacted OTU. [Default: %(default)s]")
+    group_output.add_argument('--log-file', default=sys.stdout, help='This output will contain several information on executed commands.')
     args = parser.parse_args()
     prevent_shell_injections(args)
 
@@ -633,18 +692,18 @@ if __name__ == '__main__':
     Logger.static_write(args.log_file, "## Application\nSoftware: " + os.path.basename(sys.argv[0]) + " (version: " + str(__version__) + ")\nCommand: " + " ".join(cmd) + "\n\n")
 
     if not args.delete and not args.mask:
-        raise argparse.ArgumentTypeError("\nYou must precise if you want to mask affiliations of delete OTU with --mask or --delete options.\n\n")
+        raise argparse.ArgumentTypeError("\n\n#ERROR : You must precise if you want to mask affiliations of delete OTU with --mask or --delete options.\n\n")
 
     if args.min_rdp_bootstrap is None and args.min_blast_identity is None and args.min_blast_coverage is None and args.max_blast_evalue is None and args.min_blast_length is None and args.taxon_ignored is None:
-        raise argparse.ArgumentTypeError( "\nAt least one filter must be set to run " + os.path.basename(sys.argv[0]) + "\n\n")
+        raise argparse.ArgumentTypeError( "\n\n#ERROR : At least one filter must be set to run " + os.path.basename(sys.argv[0]) + "\n\n")
     
     in_biom = BiomIO.from_json( args.input_biom )
 
     if args.min_rdp_bootstrap is not None:
         if not in_biom.has_observation_metadata("rdp_bootstrap"):
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'rdp_bootstrap'. You cannot use the parameter '--min-rdp-bootstrap' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'rdp_bootstrap'. You cannot use the parameter '--min-rdp-bootstrap' on this file.\n\n" )
         elif not args.min_rdp_bootstrap["rank"] in args.rdp_taxonomy_ranks:
-            raise argparse.ArgumentTypeError( "\nThe taxonomic rank choosen in '--min-rdp-bootstrap' must be in '--rdp-taxonomy-ranks' (" + ";".join(args.rdp_taxonomy_ranks) + ").\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The taxonomic rank choosen in '--min-rdp-bootstrap' must be in '--rdp-taxonomy-ranks' (" + ";".join(args.rdp_taxonomy_ranks) + ").\n\n" )
         else:
             nb_rank = 0
             for observation in in_biom.get_observations():
@@ -652,18 +711,18 @@ if __name__ == '__main__':
                     nb_rank = len(observation['metadata']['rdp_bootstrap'])
                     break
             if nb_rank != len(args.taxonomic_ranks):
-                raise argparse.ArgumentTypeError("\nRDP taxonomic metadata is defined on " + str(nb_rank) + " and you precise " + str(len(args.taxonomic_ranks)) + " ranks name (see --taxonomic-ranks)\n\n")
+                raise argparse.ArgumentTypeError("\n\n#ERROR : RDP taxonomic metadata is defined on " + str(nb_rank) + " and you precise " + str(len(args.taxonomic_ranks)) + " ranks name (see --taxonomic-ranks)\n\n")
     if not in_biom.has_observation_metadata("blast_affiliations"):
         if args.min_blast_length is not None:
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--min-blast-length' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--min-blast-length' on this file.\n\n" )
         if args.max_blast_evalue is not None:
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--max-blast-evalue' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--max-blast-evalue' on this file.\n\n" )
         if args.min_blast_identity is not None:
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--min-blast-identity' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--min-blast-identity' on this file.\n\n" )
         if args.min_blast_coverage is not None:
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--max-blast-coverage' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--max-blast-coverage' on this file.\n\n" )
         if args.taxon_ignored is not None:
-            raise argparse.ArgumentTypeError( "\nThe BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--taxon-ignored' on this file.\n\n" )
+            raise argparse.ArgumentTypeError( "\n\n#ERROR : The BIOM input does not contain the metadata 'blast_affiliations'. You cannot use the parameter '--taxon-ignored' on this file.\n\n" )
     del in_biom
 
     # Process

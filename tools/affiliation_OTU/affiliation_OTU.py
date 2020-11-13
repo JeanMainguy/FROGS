@@ -332,7 +332,7 @@ def get_results( biom_file ):
         nb_seq = biom.get_observation_count( cluster["id"] )
         global_results["nb_clstr"] += 1
         global_results["nb_seq"] += nb_seq
-        if cluster["metadata"]["blast_taxonomy"] is not None:
+        if cluster["metadata"]["blast_taxonomy"] is not None and len(cluster["metadata"]["blast_taxonomy"]) > 0:
             global_results["nb_clstr_with_affi"] += 1
             global_results["nb_seq_with_affi"] += nb_seq
             for depth, taxon in enumerate(cluster["metadata"]["blast_taxonomy"]):
@@ -356,7 +356,7 @@ def get_results( biom_file ):
             if count > 0:
                 samples_results[sample_name]["nb_clstr"] += 1
                 samples_results[sample_name]["nb_seq"] += count
-                if cluster["metadata"]["blast_taxonomy"] is not None:
+                if cluster["metadata"]["blast_taxonomy"] is not None and len(cluster["metadata"]["blast_taxonomy"]) > 0:
                     samples_results[sample_name]["nb_clstr_with_affi"] += 1
                     samples_results[sample_name]["nb_seq_with_affi"] += count
     return global_results, samples_results
@@ -414,7 +414,7 @@ def rdp_parallel_submission( function, inputs, outputs, logs, cpu_used, referenc
     # Check processes status
     for current_process in processes:
         if issubclass(current_process['process'].__class__, multiprocessing.Process) and current_process['process'].exitcode != 0:
-            raise Exception("\nError in sub-process execution.\n\n")
+            raise Exception("\n\n#ERROR : Error in sub-process execution.\n\n")
 
 def process_multiple_needleall(reference, inputs_fasta, temp_sams, temp_logs, outputs, log_files, tempFiles_manager, debug):    
     for idx in range(len(inputs_fasta)):
@@ -468,7 +468,7 @@ def needleall_parallel_submission( function, reference, inputs_fasta, temp_sams,
     # Check processes status
     for current_process in processes:
         if issubclass(current_process['process'].__class__, multiprocessing.Process) and current_process['process'].exitcode != 0:
-            raise Exception("\nError in sub-process execution.\n\n")
+            raise Exception("\n\n#ERROR : Error in sub-process execution.\n\n")
 
 ###################################################################################################################
 ###                                              MAIN                                                           ###
@@ -484,13 +484,13 @@ if __name__ == "__main__":
     parser.add_argument( '-v', '--version', action='version', version=__version__)
     # Inputs
     group_input = parser.add_argument_group('Inputs')
-    group_input.add_argument('-r', '--reference', required=True, help='Preformated reference file.')
-    group_input.add_argument('-b', '--input-biom', required=True, help='Abundance table from the clusterisation program (format: BIOM).')
-    group_input.add_argument('-f', '--input-fasta', required=True, help="Fasta file of OTU's seed (format: fasta).")
+    group_input.add_argument('-r', '--reference', required=True, help='Preformated reference file (format: blast-indexed FASTA).')
+    group_input.add_argument('-b', '--input-biom', required=True, help='BIOM file (format: BIOM).')
+    group_input.add_argument('-f', '--input-fasta', required=True, help="FASTA file of OTU's seed (format: FASTA).")
     # Outputs
     group_output = parser.add_argument_group('Outputs')
-    group_output.add_argument('-o', '--output-biom', default='affiliation.biom', help='File which add affiliation annotations from blast/needleall and/or RDPtools to the abundance table. [Default: %(default)s]')
-    group_output.add_argument('-s', '--summary', default='summary.html', help='Report of the results (format: HTML). [Default: %(default)s]')
+    group_output.add_argument('-o', '--output-biom', default='affiliation_abundance.biom', help='BIOM file with added affiliation annotations from blast/needleall and/or RDPtools. [Default: %(default)s]')
+    group_output.add_argument('-s', '--summary', default='affiliation_OTU.html', help='The HTML file containing the graphs. [Default: %(default)s]')
     group_output.add_argument('-l', '--log-file', default=sys.stdout, help='The list of commands executed.')
     args = parser.parse_args()
     prevent_shell_injections(args)
@@ -521,7 +521,7 @@ if __name__ == "__main__":
         Logger.static_write(args.log_file, "## Application\nSoftware: " + os.path.basename(sys.argv[0]) + " (version: " + str(__version__) + ")\nCommand: " + " ".join(sys.argv) + "\n\n")
         nb_seq, nb_combined = extract_FROGS_combined(args.input_fasta, fasta_full_length, fasta_combined)
         if nb_seq == 0 : 
-            raise Exception("\nYour input fasta file is empty!\n\n")
+            raise Exception("\n\n#ERROR : Your input fasta file is empty!\n\n")
         Logger.static_write(args.log_file, "Nb seq : " + str(nb_seq) + "\n")
         if nb_combined > 0 :
             Logger.static_write(args.log_file, "\t with nb seq artificially combined :" + str(nb_combined) +"\n")

@@ -28,7 +28,7 @@ import argparse
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 FROGS_DIR=""
-if CURRENT_DIR.endswith("phylo_import"):
+if CURRENT_DIR.endswith("phyloseq_import"):
     FROGS_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
 else:
     FROGS_DIR = os.path.dirname(CURRENT_DIR)
@@ -72,7 +72,7 @@ class Rscript(Cmd):
         @param rmd_stderr: [str] Path to temporary Rmarkdown stderr output file
         """ 
         # rmd = os.path.join(CURRENT_DIR, "r_import_data_notebook.Rmd")
-        rmd = os.path.join(CURRENT_DIR, "r_import_data.Rmd")
+        rmd = os.path.join(CURRENT_DIR, "phyloseq_import_data.Rmd")
         Cmd.__init__( self,
                       'Rscript',
                       'Run r_import_data.Rmd',
@@ -128,15 +128,15 @@ if __name__ == "__main__":
     parser.add_argument( '-r','--ranks', type=str, nargs='*', default=['Kingdom', 'Phylum', 'Class', 'Order','Family','Genus', 'Species'], help='The ordered taxonomic ranks levels stored in BIOM. Each rank is separated by one space. [Default: %(default)s]')      
     # Inputs
     group_input = parser.add_argument_group( 'Inputs' )
-    group_input.add_argument( '-b', '--biomfile', required=True, help='path to the abundance biom file.' )
-    group_input.add_argument( '-s', '--samplefile', required=True, help='path to sample file (format: tabular).' )
-    group_input.add_argument( '-t', '--treefile', default=None, help='path to tree file from FROGS Tree (format: Newich "nhx" or "nwk" ).' )
+    group_input.add_argument( '-b', '--biomfile', required=True, help='path to the abundance BIOM file.' )
+    group_input.add_argument( '-s', '--samplefile', required=True, help='path to sample file (format: TSV).' )
+    group_input.add_argument( '-t', '--treefile', default=None, help='path to tree file from FROGS Tree (format: Newick "nhx" or "nwk" ).' )
    
     # output
     group_output = parser.add_argument_group( 'Outputs' ) 
     group_output.add_argument('--rdata', default='phyloseq_data.Rdata', help="path to store phyloseq-class object in Rdata file. [Default: %(default)s]" )
-    group_output.add_argument('-o','--html', default='summary.nb.html', help="path to store resulting notebook html file : .nb.html [Default: %(default)s]" )
-    group_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')   
+    group_output.add_argument('-o','--html', default='phyloseq_import_summary.nb.html', help="The HTML file containing the graphs. [Default: %(default)s]" )
+    group_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several informations on executed commands.')   
     args = parser.parse_args()
     prevent_shell_injections(args)
    
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     to_standardize = False
     if not biom.has_metadata("taxonomy") :
         if not biom.has_metadata("blast_taxonomy"):
-            raise Exception("\nYour biom input file is not comming from FROGS and has no standard taxonomy metadata.\n\n")
+            raise Exception("\n\n#ERROR : Your biom input file is not comming from FROGS and has no standard taxonomy metadata.\n\n")
         else:
             to_standardize=True
     # check sample names compatibility between input biom and sample metadata file
@@ -163,9 +163,12 @@ if __name__ == "__main__":
         sample_metadata_list.add(line.split()[0])
 
     biom_sample_list = set([name for name in biom.get_samples_names()])
-
-    if sample_metadata_list.difference(biom_sample_list) or biom_sample_list.difference(sample_metadata_list):
-        raise Exception("\nSamples names are not consistent between sample metadata file and biom file\n" + "samples specific from sample metadata file are :" + ", ".join([str(s) for s in sample_metadata_list.difference(biom_sample_list) ]) + "\n" + "samples specific from biom file are : " + ", ".join([str(s) for s in biom_sample_list.difference(sample_metadata_list) ]) + "\n\n")
+    sample_metadata_spec = sample_metadata_list.difference(biom_sample_list) 
+    sample_biom_spec = biom_sample_list.difference(sample_metadata_list)
+    if len(sample_biom_spec) > 0 :
+        Logger.static_write(args.log_file, "# WARNING : " + str(len(sample_biom_spec)) + " samples from your biom file are not present in your sample metadata file. They will be excluded from further analysis \n\t" + "; ".join(sample_biom_spec) + "\n\n")
+    if len(sample_metadata_spec) > 0 :
+       raise Exception( "\n\n#ERROR : " + str(len(sample_metadata_spec)) + " among " + str(len(sample_metadata_list)) + " samples from your sample metadata file are not present in your biom file:\n\t" + ";".join(sample_metadata_spec) + "\nPlease give a sample metadata file that fits your abundance biom file\n\n")
 
     if (args.treefile is None) :
         treefile="None"
