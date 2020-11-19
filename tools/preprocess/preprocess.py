@@ -235,10 +235,18 @@ class Cutadapt5prim(Cmd):
         @param cutadapt_err: [str] Path to the error file.
         @param param: [Namespace] The primer sequence 'param.five_prim_primer'.
         """
+        
+        command_args = f'-g {param.five_prim_primer }'
+        command_args += f' --error-rate 0.1 --discard-untrimmed --match-read-wildcards '
+        command_args += '--revcomp '
+        command_args += f'--overlap {len(param.five_prim_primer) -1} -o {out_fastq} {in_fastq}'
+        command_args += f' >  {cutadapt_log}  2>  {cutadapt_err}'
+
+        #command_args = '-g ' + param.five_prim_primer + ' --error-rate 0.1 --discard-untrimmed --match-read-wildcards --overlap ' + str(len(param.five_prim_primer) -1) + ' -o ' + out_fastq + ' ' + in_fastq + ' > ' + cutadapt_log + ' 2> ' + cutadapt_err
         Cmd.__init__( self,
                       'cutadapt',
                       "Removes reads without the 5' primer and removes primer sequence.",
-                      '-g ' + param.five_prim_primer + ' --error-rate 0.1 --discard-untrimmed --match-read-wildcards --overlap ' + str(len(param.five_prim_primer) -1) + ' -o ' + out_fastq + ' ' + in_fastq + ' > ' + cutadapt_log + ' 2> ' + cutadapt_err,
+                      command_args,
                       '--version' )
         self.output_seq = out_fastq
 
@@ -279,10 +287,20 @@ class Cutadapt3prim(Cmd):
         @param cutadapt_err: [str] Path to the error file.
         @param param: [Namespace] The primer sequence 'param.three_prim_primer'.
         """
+
+
+        command_args = f'-a {param.three_prim_primer}'
+        command_args += f' --error-rate 0.1 --discard-untrimmed --match-read-wildcards '
+        command_args += '--revcomp '
+        command_args += f'--overlap {len(param.three_prim_primer) -1} -o {out_fastq} {in_fastq}'
+        command_args += f' >  {cutadapt_log}  2>  {cutadapt_err}'
+
+
+        # command_args = '-a ' + param.three_prim_primer + ' --error-rate 0.1 --discard-untrimmed --match-read-wildcards --overlap ' + str(len(param.three_prim_primer) -1) + ' -o ' + out_fastq + ' ' + in_fastq + ' > ' + cutadapt_log + ' 2> ' + cutadapt_err
         Cmd.__init__( self,
                       'cutadapt',
                       "Removes reads without the 3' primer and removes primer sequence.",
-                      '-a ' + param.three_prim_primer + ' --error-rate 0.1 --discard-untrimmed --match-read-wildcards --overlap ' + str(len(param.three_prim_primer) -1) + ' -o ' + out_fastq + ' ' + in_fastq + ' > ' + cutadapt_log + ' 2> ' + cutadapt_err,
+                      command_args,
                       '--version' )
         self.output_seq = out_fastq
 
