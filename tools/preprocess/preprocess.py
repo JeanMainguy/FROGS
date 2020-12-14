@@ -1165,8 +1165,48 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser( description='Pre-process amplicons to use reads in diversity analysis.' )
     parser.add_argument( '-v', '--version', action='version', version=__version__ )
+    
+    # common arguments to all type of reads
+    common_arg_parser = argparse.ArgumentParser(add_help=False)
+    common_arg_parser.add_argument( '--min-amplicon-size', type=int, required=True, help='The minimum size for the amplicons (with primers).' )
+    common_arg_parser.add_argument( '--max-amplicon-size', type=int, required=True, help='The maximum size for the amplicons (with primers).' )
+    common_arg_parser.add_argument( '--five-prim-primer', type=str, help="The 5' primer sequence (wildcards are accepted)." )
+    common_arg_parser.add_argument( '--three-prim-primer', type=str, help="The 3' primer sequence (wildcards are accepted)." )
+    common_arg_parser.add_argument( '--without-primers', action='store_true', default=False, help="Use this option when you use custom sequencing primers and these primers are the PCR primers. In this case the reads do not contain the PCR primers." )
+    common_arg_parser.add_argument( '-p', '--nb-cpus', type=int, default=1, help="The maximum number of CPUs used. [Default: %(default)s]" )
+    common_arg_parser.add_argument( '--debug', default=False, action='store_true', help="Keep temporary files to debug program." )
+
+
+    #  common outputs
+    common_arg_output_parser = argparse.ArgumentParser(add_help=False)
+    group_common_arg_output = common_arg_output_parser.add_argument_group( 'Outputs' )
+    group_common_arg_output.add_argument( '-d', '--output-dereplicated', default='preprocess.fasta', help='FASTA file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
+    group_common_arg_output.add_argument( '-c', '--output-count', default='preprocess_counts.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
+    group_common_arg_output.add_argument( '-s', '--summary', default='preprocess.html', help='The HTML file containing the graphs. [Default: %(default)s]')
+    group_common_arg_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')
+
+    # Illumina specific  arguments
+    parser_illumina = argparse.ArgumentParser(add_help=False)
+    parser_illumina.add_argument( '--merge-software', default="vsearch", choices=["vsearch","flash","pear"], help='Software used to merge paired reads' )
+    parser_illumina.add_argument( '--keep-unmerged', default=False, action='store_true', help='In case of uncontiged paired reads, keep unmerged, and artificially combined them with 100 Ns.' )
+    parser_illumina.add_argument( '--expected-amplicon-size', type=int, help='The expected size for the majority of the amplicons (with primers), if using Flash as read pair merge software.' )
+    parser_illumina.add_argument( '--R1-size', type=int, help='The read1 size.' )
+    parser_illumina.add_argument( '--R2-size', type=int, help='The read2 size.' )
+    parser_illumina.add_argument( '--mismatch-rate', type=float, default=0.1, help='Maxi mismatch rate in overlap region. [Default: %(default)s]' )
+    parser_illumina.add_argument( '--quality-scale', type=str, default="33", choices=["33", "64"], help='The phred base quality scale, either 33 or 64 if using Vsearch as read pair merge software [Default: %(default)s]' )
+    parser_illumina.add_argument( '--already-contiged', action='store_true', default=False, help='The archive contains 1 file by sample : Reads 1 and Reads 2 are already contiged by pair.' )
+
+    # Illumina inputs
+    group_illumina_input = parser_illumina.add_argument_group( 'Inputs' )
+    group_illumina_input.add_argument( '--samples-names', type=spl_name_type, nargs='+', default=None, help='The sample name for each R1/R2-files.' )
+    group_illumina_input.add_argument( '--input-archive', default=None, help='The tar file containing R1 file and R2 file for each sample.' )
+    group_illumina_input.add_argument( '--input-R1', required=None, nargs='+', help='The R1 sequence file for each sample (format: fastq).' )
+    group_illumina_input.add_argument( '--input-R2', required=None, nargs='+', help='The R2 sequence file for each sample (format: fastq).' )
+    group_illumina_input.set_defaults( sequencer='illumina' )
+
+    # Combine the common and illumina arguments into a subparser
     subparsers = parser.add_subparsers()
-    parser_illumina = subparsers.add_parser( 'illumina', help='Illumina sequencers.', usage='''
+    parser_illumina = subparsers.add_parser( 'illumina', help='Illumina sequencers.', parents=[common_arg_parser, parser_illumina, common_arg_output_parser], usage='''
   For samples files:
     preprocess.py illumina
       --input-R1 R1_FILE [R1_FILE ...]
@@ -1191,38 +1231,20 @@ if __name__ == "__main__":
       [-d DEREPLICATED_FILE] [-c COUNT_FILE] [--artComb-output-dereplicated ART_DEREPLICATED_FILE] [--artComb-output-count ART_COUNT_FILE]
       [-s SUMMARY_FILE] [-l LOG_FILE]
 ''')
-    #     Illumina parameters
-    parser_illumina.add_argument( '--merge-software', default="vsearch", choices=["vsearch","flash","pear"], help='Software used to merge paired reads' )
-    parser_illumina.add_argument( '--keep-unmerged', default=False, action='store_true', help='In case of uncontiged paired reads, keep unmerged, and artificially combined them with 100 Ns.' )
-    parser_illumina.add_argument( '--min-amplicon-size', type=int, required=True, help='The minimum size for the amplicons (with primers).' )
-    parser_illumina.add_argument( '--max-amplicon-size', type=int, required=True, help='The maximum size for the amplicons (with primers).' )
-    parser_illumina.add_argument( '--expected-amplicon-size', type=int, help='The expected size for the majority of the amplicons (with primers), if using Flash as read pair merge software.' )
-    parser_illumina.add_argument( '--five-prim-primer', type=str, help="The 5' primer sequence (wildcards are accepted)." )
-    parser_illumina.add_argument( '--three-prim-primer', type=str, help="The 3' primer sequence (wildcards are accepted)." )
-    parser_illumina.add_argument( '--without-primers', action='store_true', default=False, help="Use this option when you use custom sequencing primers and these primers are the PCR primers. In this case the reads do not contain the PCR primers." )
-    parser_illumina.add_argument( '--R1-size', type=int, help='The read1 size.' )
-    parser_illumina.add_argument( '--R2-size', type=int, help='The read2 size.' )
-    parser_illumina.add_argument( '--mismatch-rate', type=float, default=0.1, help='Maxi mismatch rate in overlap region. [Default: %(default)s]' )
-    parser_illumina.add_argument( '--quality-scale', type=str, default="33", choices=["33", "64"], help='The phred base quality scale, either 33 or 64 if using Vsearch as read pair merge software [Default: %(default)s]' )
-    parser_illumina.add_argument( '--already-contiged', action='store_true', default=False, help='The archive contains 1 file by sample : Reads 1 and Reads 2 are already contiged by pair.' )
-    parser_illumina.add_argument( '-p', '--nb-cpus', type=int, default=1, help="The maximum number of CPUs used. [Default: %(default)s]" )
-    parser_illumina.add_argument( '--debug', default=False, action='store_true', help="Keep temporary files to debug program." )
-    #     Illumina inputs
-    group_illumina_input = parser_illumina.add_argument_group( 'Inputs' )
-    group_illumina_input.add_argument( '--samples-names', type=spl_name_type, nargs='+', default=None, help='The sample name for each R1/R2-files.' )
-    group_illumina_input.add_argument( '--input-archive', default=None, help='The tar file containing R1 file and R2 file for each sample.' )
-    group_illumina_input.add_argument( '--input-R1', required=None, nargs='+', help='The R1 sequence file for each sample (format: fastq).' )
-    group_illumina_input.add_argument( '--input-R2', required=None, nargs='+', help='The R2 sequence file for each sample (format: fastq).' )
-    group_illumina_input.set_defaults( sequencer='illumina' )
-    #     Illumina outputs
-    group_illumina_output = parser_illumina.add_argument_group( 'Outputs' )
-    group_illumina_output.add_argument( '-d', '--output-dereplicated', default='preprocess.fasta', help='FASTA file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
-    group_illumina_output.add_argument( '-c', '--output-count', default='preprocess_counts.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
-    group_illumina_output.add_argument( '-s', '--summary', default='preprocess.html', help='The HTML file containing the graphs. [Default: %(default)s]')
-    group_illumina_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')
 
-    # 454
-    parser_454 = subparsers.add_parser('454', help='454 sequencers.', usage='''
+    # 454 specific  arguments
+    parser_454 = argparse.ArgumentParser(add_help=False)
+    group_454_input = parser_454.add_argument_group( 'Inputs' )
+    group_454_input.add_argument( '--samples-names', type=spl_name_type, nargs='+', default=None, help='The sample name for each R1/R2-files.' )
+    group_454_input.add_argument( '--input-archive', default=None, help='The tar file containing R1 file and R2 file for each sample (format: tar).' )
+    group_454_input.add_argument( '--input-R1', required=None, nargs='+', help='The sequence file for each sample (format: fastq).' )
+    group_454_input.set_defaults( sequencer='illumina' )
+    
+    parser_454.set_defaults( sequencer='454' )
+    parser_454.set_defaults( already_contiged=True, keep_unmerged=False )
+
+    # Combine the common and 454 arguments into a subparser
+    parser_454 = subparsers.add_parser('454', help='454 sequencers.', parents=[common_arg_parser, parser_454, common_arg_output_parser], usage='''
   preprocess.py 454
     --input-archive ARCHIVE_FILE | --input-R1 R1_FILE [R1_FILE ...]
     --min-amplicon-size MIN_AMPLICON_SIZE
@@ -1233,26 +1255,6 @@ if __name__ == "__main__":
     [-d DEREPLICATED_FILE] [-c COUNT_FILE]
     [-s SUMMARY_FILE] [-l LOG_FILE]
 ''')
-    parser_454.add_argument( '--min-amplicon-size', type=int, required=True, help='The minimum size for the amplicons (with primers).' )
-    parser_454.add_argument( '--max-amplicon-size', type=int, required=True, help='The maximum size for the amplicons (with primers).' )
-    parser_454.add_argument( '--five-prim-primer', type=str, required=True, help="The 5' primer sequence (wildcards are accepted)." )
-    parser_454.add_argument( '--three-prim-primer', type=str, required=True, help="The 3' primer sequence (wildcards are accepted)." )
-    parser_454.add_argument( '-p', '--nb-cpus', type=int, default=1, help="The maximum number of CPUs used. [Default: %(default)s]" )
-    parser_454.add_argument( '--debug', default=False, action='store_true', help="Keep temporary files to debug program." )
-    #     454 inputs
-    group_454_input = parser_454.add_argument_group( 'Inputs' )
-    group_454_input.add_argument( '--samples-names', type=spl_name_type, nargs='+', default=None, help='The sample name for each R1/R2-files.' )
-    group_454_input.add_argument( '--input-archive', default=None, help='The tar file containing R1 file and R2 file for each sample (format: tar).' )
-    group_454_input.add_argument( '--input-R1', required=None, nargs='+', help='The sequence file for each sample (format: fastq).' )
-    group_454_input.set_defaults( sequencer='illumina' )
-    #     454 outputs
-    group_454_output = parser_454.add_argument_group( 'Outputs' )
-    group_454_output.add_argument( '-d', '--output-dereplicated', default='preprocess.fasta', help='FASTA file with unique sequences. Each sequence has an ID ended with the number of initial sequences represented (example : ">a0101;size=10"). [Default: %(default)s]')
-    group_454_output.add_argument( '-c', '--output-count', default='preprocess_counts.tsv', help='TSV file with count by sample for each unique sequence (example with 3 samples : "a0101<TAB>5<TAB>8<TAB>0"). [Default: %(default)s]')
-    group_454_output.add_argument( '-s', '--summary', default='preprocess.html', help='The HTML file containing the graphs. [Default: %(default)s]')
-    group_454_output.add_argument( '-l', '--log-file', default=sys.stdout, help='This output file will contain several information on executed commands.')
-    parser_454.set_defaults( sequencer='454' )
-    parser_454.set_defaults( already_contiged=True, keep_unmerged=False )
 
     # Parse parameters
     args = parser.parse_args()
