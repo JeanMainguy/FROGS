@@ -88,3 +88,10 @@ echo "454 R1"
                     --min-amplicon-size 340 --max-amplicon-size 450 \
                     --five-prim-primer "ACGGGAGGCAGCAG" --three-prim-primer "AGGATTAGATACCCTGGTA" \
                     --output-dereplicated test/derep_SRR443364_454.fasta --output-count test/count_SRR443364_454.tsv --summary test/summary_SRR443364_454.html --log-file test/log_SRR443364_454.txt
+
+
+echo "pacbio hifi reads"
+./preprocess.py pacbio-hifi --input-reads data/h4k_mockbact_hifi.fastq.gz  \
+                         --min-amplicon-size 43 --max-amplicon-size 10000 \
+                         --five-prim-primer AGRGTTTGATYHTGGCTCAG --three-prim-primer AAGTCRTAACAAGGTARCCGTA \
+                         --output-dereplicated test/derep_mockbact_hifi.fasta --output-count test/count_mockbact_hifi.tsv --summary test/summary_h4kADNmock_hifi.html --log-file test/log_mockbact_hifi.txt
