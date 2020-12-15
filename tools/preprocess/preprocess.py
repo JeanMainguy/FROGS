@@ -1089,7 +1089,7 @@ def process_sample(R1_file, R2_file, sample_name, out_file, art_out_file, length
             shutil.copyfile(out_contig, renamed_out_contig)  # prevent symlink problem
             Remove454prim(renamed_out_contig, out_cutadapt, log_3prim_cutadapt,
                           err_3prim_cutadapt, args).submit(log_file)
-        else:  # Illumina
+        else:  # Illumina or pacbio hifi
             if args.five_prim_primer and args.three_prim_primer:  # Illumina standard sequencing protocol
                 Cutadapt5prim(out_contig, tmp_cutadapt, log_5prim_cutadapt,
                               err_5prim_cutadapt, args).submit(log_file)
@@ -1324,7 +1324,7 @@ if __name__ == "__main__":
 
     # Combine the common and illumina arguments into a subparser
     subparsers = parser.add_subparsers()
-    parser_illumina = subparsers.add_parser('illumina', help='Illumina sequencers.', parents=[common_arg_parser, parser_illumina, common_arg_output_parser], usage='''
+    subparser_illumina = subparsers.add_parser('illumina', help='Illumina sequencers.', parents=[common_arg_parser, parser_illumina, common_arg_output_parser], usage='''
   For samples files:
     preprocess.py illumina
       --input-R1 R1_FILE [R1_FILE ...]
@@ -1365,8 +1365,35 @@ if __name__ == "__main__":
     parser_454.set_defaults(already_contiged=True, keep_unmerged=False)
 
     # Combine the common and 454 arguments into a subparser
-    parser_454 = subparsers.add_parser('454', help='454 sequencers.', parents=[common_arg_parser, parser_454, common_arg_output_parser], usage='''
+    subparser_454 = subparsers.add_parser('454', help='454 sequencers.', parents=[common_arg_parser, parser_454, common_arg_output_parser], usage='''
   preprocess.py 454
+    --input-archive ARCHIVE_FILE | --input-R1 R1_FILE [R1_FILE ...]
+    --min-amplicon-size MIN_AMPLICON_SIZE
+    --max-amplicon-size MAX_AMPLICON_SIZE
+    --five-prim-primer FIVE_PRIM_PRIMER
+    --three-prim-primer THREE_PRIM_PRIMER
+    [-p NB_CPUS] [--debug] [-v]
+    [-d DEREPLICATED_FILE] [-c COUNT_FILE]
+    [-s SUMMARY_FILE] [-l LOG_FILE]
+''')
+
+    # papcbio hifi specific  arguments
+    parser_hifi = argparse.ArgumentParser(add_help=False)
+    group_hifi_input = parser_hifi.add_argument_group('Inputs')
+    group_hifi_input.add_argument('--samples-names', type=spl_name_type,
+                                  nargs='+', default=None, help='The sample name for each R1/R2-files.')
+    group_hifi_input.add_argument('--input-archive', default=None,
+                                  help='The tar file containing R1 file and R2 file for each sample (format: tar).')
+    group_hifi_input.add_argument('--input-reads', dest='input_R1', required=None, nargs='+',
+                                  help='The sequence file for each sample (format: fastq).')
+    # group_hifi_input.set_defaults(sequencer='illumina')
+
+    parser_hifi.set_defaults(sequencer='pacbio-hifi')
+    parser_hifi.set_defaults(already_contiged=True, keep_unmerged=False)
+
+    # Combine the common and 454 arguments into a subparser
+    subparser_hifi = subparsers.add_parser('pacbio-hifi', help='pacbio-hifi sequencers.', parents=[common_arg_parser, parser_hifi, common_arg_output_parser], usage='''
+  preprocess.py pacbio-hifi
     --input-archive ARCHIVE_FILE | --input-R1 R1_FILE [R1_FILE ...]
     --min-amplicon-size MIN_AMPLICON_SIZE
     --max-amplicon-size MAX_AMPLICON_SIZE
